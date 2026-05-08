@@ -128,7 +128,7 @@ async function startQR() {
         browser: ["Ubuntu", "Safari", "1.0.0"],
     });
 
-    sessions.set(sessionId, { sock, authPath, qr: null, saveCreds });
+    sessions.set(sessionId, { sock, authPath, qr: null, saveCreds, paired: false });
     return sessionId;
 }
 
@@ -144,6 +144,9 @@ app.get('/qr-id', async (req, res) => {
                 sessions.get(sessionId).qr = qr;
             }
             if (connection === 'open') {
+                const sessionEntry = sessions.get(sessionId);
+                if (sessionEntry) sessionEntry.paired = true;
+                
                 const creds = await fs.readFile(path.join(authPath, 'creds.json'), 'utf-8');
                 const sessionString = Buffer.from(creds).toString('base64');
                 const fullSession = `Nexus-MD;;;${sessionString}`;
@@ -171,7 +174,8 @@ app.get('/qr-id', async (req, res) => {
 app.get('/qr/:id', async (req, res) => {
     const session = sessions.get(req.params.id);
     if (!session) return res.status(404).json({ error: 'Session not found' });
-    if (!session.qr) return res.status(202).json({ message: 'Waiting for QR' });
+    if (!session.qr && !session.paired) return res.status(202).json({ message: 'Waiting for QR' });
+    if (session.paired) return res.json({ paired: true });
 
     try {
         const dataUrl = await qrcode.toDataURL(session.qr);

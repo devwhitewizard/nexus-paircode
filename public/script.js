@@ -77,14 +77,19 @@ async function startQRFlow() {
         if (qrInterval) clearInterval(qrInterval);
         
         qrInterval = setInterval(async () => {
-            const qrRes = await fetch(`/qr/${sessionId}`);
-            if (qrRes.status === 200) {
-                const { qr } = await qrRes.json();
-                img.src = qr;
+            const response = await fetch(`/qr/${sessionId}`);
+            const data = await response.json();
+        
+            if (response.status === 200 && data.qr) {
+                img.src = data.qr;
                 img.classList.remove('hidden');
                 placeholder.classList.add('hidden');
-                status.innerText = 'Scan this code with WhatsApp';
-            } else if (qrRes.status === 202) {
+                status.innerText = "QR Code active. Scan with WhatsApp.";
+            } else if (response.status === 200 && data.paired) {
+                clearInterval(qrInterval);
+                qrContainer.innerHTML = '<div class="success-icon">✅</div><h3>Paired Successfully!</h3><p>Check your WhatsApp for the session ID.</p>';
+                status.innerText = "";
+            } else if (response.status === 202) {
                 status.innerText = 'Waiting for WhatsApp...';
             } else {
                 clearInterval(qrInterval);
