@@ -88,7 +88,7 @@ app.get('/pair', async (req, res) => {
                 // Get the session ID (Base64 encoded creds)
                 const creds = await fs.readFile(path.join(authPath, 'creds.json'), 'utf-8');
                 const sessionString = Buffer.from(creds).toString('base64');
-                const fullSession = `Nexus-MD;;;${sessionString}`;
+                const fullSession = `nexus;;;${sessionString}`;
 
                 // Store session for remote fetching (24 hour expiry)
                 remoteSessions.set(sessionId, fullSession);
