@@ -9,6 +9,9 @@ const qrcode = require('qrcode');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Persistent session store (in-memory for now, could be DB later)
+const remoteSessions = new Map();
+
 app.use(express.static(path.join(__dirname, 'public')));
 console.log('Serving static files from:', path.join(__dirname, 'public'));
 app.use(express.json());
@@ -29,7 +32,9 @@ async function startPairing(phoneNumber) {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
-            browser: ["Ubuntu", "Safari", "1.0.0"],
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            syncFullHistory: false,
+            markOnlineOnConnect: true,
         });
 
         sessions.set(sessionId, { sock, authPath });
@@ -85,6 +90,10 @@ app.get('/pair', async (req, res) => {
                 const sessionString = Buffer.from(creds).toString('base64');
                 const fullSession = `Nexus-MD;;;${sessionString}`;
 
+                // Store session for remote fetching (24 hour expiry)
+                remoteSessions.set(sessionId, fullSession);
+                setTimeout(() => remoteSessions.delete(sessionId), 24 * 60 * 60 * 1000);
+
                 // Send the session to the user
                 await sock.sendMessage(sock.user.id, { 
                     text: `🌟 *NEXUS-MD SESSION* 🌟\n\n👋 Hello ${sock.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-MD*` 
@@ -125,7 +134,9 @@ async function startQR() {
     const sock = makeWASocket({
         logger: pino({ level: 'silent' }),
         auth: state,
-        browser: ["Ubuntu", "Safari", "1.0.0"],
+        browser: ["Ubuntu", "Chrome", "20.0.04"],
+        syncFullHistory: false,
+        markOnlineOnConnect: true,
     });
 
     sessions.set(sessionId, { sock, authPath, qr: null, saveCreds, paired: false });
@@ -150,6 +161,10 @@ app.get('/qr-id', async (req, res) => {
                 const creds = await fs.readFile(path.join(authPath, 'creds.json'), 'utf-8');
                 const sessionString = Buffer.from(creds).toString('base64');
                 const fullSession = `Nexus-MD;;;${sessionString}`;
+
+                // Store for remote fetching
+                remoteSessions.set(sessionId, fullSession);
+                setTimeout(() => remoteSessions.delete(sessionId), 24 * 60 * 60 * 1000);
 
                 await sock.sendMessage(sock.user.id, { 
                     text: `🌟 *NEXUS-MD SESSION* 🌟\n\n👋 Hello ${sock.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-MD*` 
@@ -183,6 +198,12 @@ app.get('/qr/:id', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: 'Failed to generate QR image' });
     }
+});
+
+app.get('/session/:id', (req, res) => {
+    const session = remoteSessions.get(req.params.id);
+    if (!session) return res.status(404).send('Session not found');
+    res.send(session);
 });
 
 app.listen(PORT, () => {
