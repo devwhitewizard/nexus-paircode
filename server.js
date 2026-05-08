@@ -10,6 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.static(path.join(__dirname, 'public')));
+console.log('Serving static files from:', path.join(__dirname, 'public'));
 app.use(express.json());
 
 // Session store for active sockets
@@ -71,7 +72,7 @@ app.get('/pair', async (req, res) => {
 
                 // Send the session to the user
                 await sock.sendMessage(sock.user.id, { 
-                    text: `*SUCCESSFULLY CONNECTED!*\n\nKeep this session ID safe. You can use it to deploy your bot.\n\n\`${fullSession}\`` 
+                    text: `🌟 *NEXUS-MD SESSION* 🌟\n\n👋 Hello ${sock.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-MD*` 
                 });
 
                 // Cleanup
@@ -133,7 +134,7 @@ app.get('/qr-id', async (req, res) => {
                 const fullSession = `Nexus-MD;;;${sessionString}`;
 
                 await sock.sendMessage(sock.user.id, { 
-                    text: `*SUCCESSFULLY CONNECTED!*\n\nKeep this session ID safe.\n\n\`${fullSession}\`` 
+                    text: `🌟 *NEXUS-MD SESSION* 🌟\n\n👋 Hello ${sock.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-MD*` 
                 });
 
                 setTimeout(async () => {
