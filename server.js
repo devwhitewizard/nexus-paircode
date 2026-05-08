@@ -29,14 +29,15 @@ async function startPairing(phoneNumber) {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
-            browser: ["Chrome (Linux)", "", ""],
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
         });
 
         sessions.set(sessionId, { sock, authPath });
 
         if (!sock.authState.creds.registered) {
-            await delay(5000); // Wait longer for socket to be ready
+            await delay(3000); 
             const code = await sock.requestPairingCode(phoneNumber.replace(/[^0-9]/g, ''));
+            console.log(`[${sessionId}] Pairing code generated for ${phoneNumber}: ${code}`);
             return { sessionId, code, saveCreds };
         }
         return { sessionId, error: 'Already registered' };
