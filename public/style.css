@@ -293,7 +293,7 @@ input:focus {
     to { transform: rotate(360deg); }
 }
 
-footer {;
+footer {
     text-align: center;
     padding: 4rem 0;
     color: var(--text-dim);
