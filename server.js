@@ -59,10 +59,24 @@ app.get('/pair', async (req, res) => {
         const { sock, authPath } = sessions.get(sessionId);
 
         sock.ev.on('creds.update', saveCreds);
+
+        // Auto-cleanup if not paired within 2 minutes
+        const timeout = setTimeout(async () => {
+            if (sessions.has(sessionId)) {
+                console.log(`[${sessionId}] Pairing timeout for ${number}`);
+                try {
+                    await sock.logout();
+                } catch (e) {}
+                await fs.remove(authPath);
+                sessions.delete(sessionId);
+            }
+        }, 120000);
+
         sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect } = update;
 
             if (connection === 'open') {
+                clearTimeout(timeout);
                 console.log(`[${sessionId}] Connection opened for ${number}`);
                 
                 // Get the session ID (Base64 encoded creds)

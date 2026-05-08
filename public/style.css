@@ -257,6 +257,13 @@ input:focus {
     text-shadow: 0 0 20px rgba(0, 242, 254, 0.4);
 }
 
+.expiration-note {
+    color: var(--secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
 .hint {
     font-size: 0.9rem;
     color: var(--text-dim);
