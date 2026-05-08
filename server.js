@@ -29,7 +29,7 @@ async function startPairing(phoneNumber) {
                 creds: state.creds,
                 keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' })),
             },
-            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            browser: ["Ubuntu", "Safari", "1.0.0"],
         });
 
         sessions.set(sessionId, { sock, authPath });
