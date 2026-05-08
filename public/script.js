@@ -26,9 +26,10 @@ getPairBtn.addEventListener('click', async () => {
         const data = await response.json();
 
         pairLoading.classList.add('hidden');
-        if (response.ok && data.code) {
+        if (data.code) {
             codeDisplay.innerText = data.code;
             pairResult.classList.remove('hidden');
+            startCountdown(120); // 2 minutes
         } else {
             alert(data.error || 'Failed to get code. Please check your number and try again.');
         }
@@ -40,6 +41,25 @@ getPairBtn.addEventListener('click', async () => {
 
 // QR Code Flow
 let qrInterval = null;
+let countdownInterval = null;
+function startCountdown(seconds) {
+    const note = document.querySelector('.expiration-note');
+    if (countdownInterval) clearInterval(countdownInterval);
+    
+    let remaining = seconds;
+    countdownInterval = setInterval(() => {
+        remaining--;
+        const mins = Math.floor(remaining / 60);
+        const secs = remaining % 60;
+        note.innerText = `This code expires in ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        
+        if (remaining <= 0) {
+            clearInterval(countdownInterval);
+            note.innerText = 'Code expired. Please request a new one.';
+            note.style.color = '#ff4b2b';
+        }
+    }, 1000);
+}
 
 async function startQRFlow() {
     const img = document.getElementById('qrImage');

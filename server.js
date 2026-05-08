@@ -125,7 +125,7 @@ async function startQR() {
     const sock = makeWASocket({
         logger: pino({ level: 'silent' }),
         auth: state,
-        browser: ["Nexus-MD", "Chrome", "1.0.0"],
+        browser: ["Ubuntu", "Safari", "1.0.0"],
     });
 
     sessions.set(sessionId, { sock, authPath, qr: null });
