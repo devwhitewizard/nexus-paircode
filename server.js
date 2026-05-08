@@ -128,14 +128,14 @@ async function startQR() {
         browser: ["Ubuntu", "Safari", "1.0.0"],
     });
 
-    sessions.set(sessionId, { sock, authPath, qr: null });
+    sessions.set(sessionId, { sock, authPath, qr: null, saveCreds });
     return sessionId;
 }
 
 app.get('/qr-id', async (req, res) => {
     try {
         const sessionId = await startQR();
-        const { sock, authPath } = sessions.get(sessionId);
+        const { sock, authPath, saveCreds } = sessions.get(sessionId);
 
         sock.ev.on('creds.update', saveCreds);
         sock.ev.on('connection.update', async (update) => {
