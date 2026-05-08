@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus-MD | Pair Code Generator</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@300;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="background-blobs">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+        <div class="blob blob-3"></div>
+    </div>
+
+    <nav>
+        <div class="logo">NEXUS<span>-MD</span></div>
+        <div class="nav-links">
+            <a href="https://github.com/Nexus-MD" target="_blank">GitHub</a>
+            <a href="https://t.me/nexus" target="_blank">Support</a>
+        </div>
+    </nav>
+
+    <main>
+        <section class="hero-section">
+            <h1 class="animate-up">Connect Your Bot <span>Globally</span></h1>
+            <p class="animate-up delay-1">Choose your preferred method to link your WhatsApp account and generate a secure session string.</p>
+            
+            <div class="connection-cards animate-up delay-2">
+                <div class="card" id="pair-code-card">
+                    <div class="card-icon">🔢</div>
+                    <h3>Pair Code</h3>
+                    <p>Connect using a simple 8-digit numeric code sent to your phone.</p>
+                    <button class="btn btn-primary" onclick="showSection('pair-section')">Get Pair Code</button>
+                </div>
+
+                <div class="card" id="qr-code-card">
+                    <div class="card-icon">🔳</div>
+                    <h3>QR Code</h3>
+                    <p>Scan a QR code from your phone's WhatsApp Linked Devices.</p>
+                    <button class="btn btn-secondary" onclick="showSection('qr-section')">Scan QR Code</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- Pair Code Section -->
+        <section id="pair-section" class="content-section hidden">
+            <div class="glass-box">
+                <button class="btn-back" onclick="showSection('hero-section')">← Back</button>
+                <h2>Link via Pairing Code</h2>
+                <p>Enter your phone number starting with country code (e.g., 254...)</p>
+                
+                <div class="input-group">
+                    <input type="text" id="phoneNumber" placeholder="254700000000">
+                    <button class="btn btn-action" id="getPairBtn">Request Code</button>
+                </div>
+
+                <div id="pairResult" class="result-area hidden">
+                    <p>Your Pairing Code:</p>
+                    <div class="code-display" id="pairingCode">--------</div>
+                    <p class="hint">Open WhatsApp > Settings > Linked Devices > Link a Device > Link with phone number instead</p>
+                </div>
+                
+                <div id="pairLoading" class="loading hidden">
+                    <div class="spinner"></div>
+                    <p>Generating Code...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- QR Code Section -->
+        <section id="qr-section" class="content-section hidden">
+            <div class="glass-box">
+                <button class="btn-back" onclick="showSection('hero-section')">← Back</button>
+                <h2>Link via QR Code</h2>
+                <div id="qrContainer" class="qr-container">
+                    <div id="qrPlaceholder" class="qr-placeholder">
+                         <div class="spinner"></div>
+                         <p>Loading QR...</p>
+                    </div>
+                    <img id="qrImage" class="hidden" src="" alt="WhatsApp QR Code">
+                </div>
+                <p class="hint">Scan this QR code with your WhatsApp app.</p>
+                <div id="qrStatus" class="status-msg"></div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2026 Nexus-MD. Built for performance and reliability.</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

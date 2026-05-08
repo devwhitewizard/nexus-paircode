@@ -1,0 +1,7 @@
+node_modules
+temp
+auth
+*.json
+!package.json
+database.db*
+.env
