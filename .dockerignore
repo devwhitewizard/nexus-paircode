@@ -1,0 +1,11 @@
+node_modules
+temp
+auth
+*.json
+!package.json
+database.db*
+.env
+.git
+.github
+Dockerfile
+render.yaml
