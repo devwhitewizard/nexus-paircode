@@ -15,232 +15,339 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const sessionDir = path.join(__dirname, "../temp");
+const qrSessions = new Map();
 
-router.get('/', async (req, res) => {
-    const id = casperId();
-    let responseSent = false;
-    let sessionCleanedUp = false;
-    let sessionSentSuccess = false;
-
-    async function cleanUpSession() {
-        if (!sessionCleanedUp) {
-            try {
-                await removeFile(path.join(sessionDir, id));
-            } catch (cleanupError) {
-                console.error("Cleanup error:", cleanupError);
-            }
-            sessionCleanedUp = true;
-        }
-    }
-
-    async function CASPER_QR_CODE() {
-        const { version } = await fetchLatestBaileysVersion();
-        const { state, saveCreds } = await useMultiFileAuthState(path.join(sessionDir, id));
-        try {
-            let Casper = makeWASocket({
-                version,
-                auth: {
-                    creds: state.creds,
-                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
-                },
-                printQRInTerminal: false,
-                logger: pino({ level: "silent" }),
-                browser: ["Ubuntu", "Chrome", "20.0.04"],
-                syncFullHistory: false,
-                markOnlineOnConnect: true,
-            });
-
-            Casper.ev.on('creds.update', saveCreds);
-            Casper.ev.on("connection.update", async (s) => {
-                const { connection, lastDisconnect, qr } = s;
-                if (qr && !responseSent) {
-                    const qrImage = await QRCode.toDataURL(qr);
-                    if (!res.headersSent) {
-                        res.send(`
+// Endpoint to serve the QR code frontend page
+router.get('/', (req, res) => {
+    res.send(`
 <!DOCTYPE html>
 <html>
 <head>
     <title>Nexus-1MD | QR CODE</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        :root {
+            --primary: #00f2fe;
+            --secondary: #4facfe;
+            --accent: #7000ff;
+            --text: #ffffff;
+            --text-light: #d3d3d3;
+            --background: #0a0a12;
+            --card-bg: #10101d;
+            --shadow: 0 10px 20px rgba(0, 242, 254, 0.15);
+            --transition: all 0.3s ease;
+        }
         body {
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            background-color: #0d0e15;
-            font-family: Arial, sans-serif;
-            color: #fff;
+            background-color: var(--background);
+            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: var(--text);
             text-align: center;
             padding: 20px;
             box-sizing: border-box;
+            background-image: radial-gradient(circle at 10% 20%, rgba(0, 242, 254, 0.08) 0%, transparent 20%), 
+                              radial-gradient(circle at 90% 80%, rgba(112, 0, 255, 0.08) 0%, transparent 20%);
         }
         .container {
+            background-color: var(--card-bg);
+            padding: 2.5rem;
+            border-radius: 20px;
+            box-shadow: var(--shadow);
             width: 100%;
-            max-width: 600px;
+            max-width: 500px;
+            border: 1px solid rgba(0, 242, 254, 0.2);
+            position: relative;
         }
         .qr-container {
             position: relative;
-            margin: 20px auto;
-            width: 300px;
-            height: 300px;
+            margin: 2rem auto;
+            width: 260px;
+            height: 260px;
             display: flex;
             justify-content: center;
             align-items: center;
+            background: #fff;
+            border-radius: 15px;
+            padding: 10px;
+            box-shadow: 0 0 20px rgba(0,242,254,0.2);
         }
         .qr-code {
-            width: 300px;
-            height: 300px;
-            padding: 10px;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 0 0 10px rgba(0,242,254,0.1), 0 0 0 20px rgba(0,242,254,0.05), 0 0 30px rgba(0,242,254,0.2);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         .qr-code img {
             width: 100%;
             height: 100%;
+            border-radius: 10px;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(0, 242, 254, 0.1);
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         h1 {
-            color: #fff;
-            margin: 0 0 15px 0;
-            font-size: 28px;
+            color: var(--primary);
+            margin: 0 0 10px 0;
+            font-size: 2rem;
             font-weight: 800;
-            text-shadow: 0 0 10px rgba(0,242,254,0.3);
+            text-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
         }
         p {
-            color: #ccc;
-            margin: 20px 0;
-            font-size: 16px;
+            color: var(--text-light);
+            margin: 10px 0;
+            font-size: 1rem;
+        }
+        .status-msg {
+            font-weight: 600;
+            color: var(--primary);
+            margin: 1.5rem 0;
+            min-height: 24px;
         }
         .back-btn {
             display: inline-block;
-            padding: 12px 25px;
-            margin-top: 15px;
-            background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%);
+            padding: 12px 30px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: #000;
             text-decoration: none;
             border-radius: 30px;
             font-weight: bold;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0,242,254,0.2);
+            box-shadow: 0 4px 15px rgba(0,242,254,0.3);
         }
         .back-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 6px 20px rgba(0,242,254,0.4);
         }
-        .pulse {
-            animation: pulse 2s infinite;
+        .success-icon {
+            font-size: 4rem;
+            color: #4caf50;
+            animation: bounce 0.6s ease;
         }
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(0,242,254,0.4); }
-            70% { box-shadow: 0 0 0 15px rgba(0,242,254,0); }
-            100% { box-shadow: 0 0 0 0 rgba(0,242,254,0); }
-        }
-        @media (max-width: 480px) {
-            .qr-container {
-                width: 260px;
-                height: 260px;
-            }
-            .qr-code {
-                width: 220px;
-                height: 220px;
-            }
-            h1 {
-                font-size: 24px;
-            }
+        @keyframes bounce {
+            0% { transform: scale(0.3); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>NEXUS-1MD QR CODE</h1>
-        <div class="qr-container">
-            <div class="qr-code pulse">
-                <img src="${qrImage}" alt="QR Code"/>
+        <h1>NEXUS-1MD QR</h1>
+        <div class="qr-container" id="qrContainer">
+            <div class="qr-code" id="qrCodeDiv">
+                <div class="spinner"></div>
             </div>
         </div>
-        <p>Scan this QR code with your phone's WhatsApp Linked Devices to connect.</p>
+        <div class="status-msg" id="statusMsg">Initializing session...</div>
         <a href="./" class="back-btn">Back</a>
     </div>
+
+    <script>
+        let sessionId = null;
+        let pollInterval = null;
+
+        async function startQRFlow() {
+            try {
+                const res = await fetch('/qr/start');
+                const data = await res.json();
+                sessionId = data.sessionId;
+
+                if (!sessionId) {
+                    document.getElementById('statusMsg').innerText = 'Failed to generate session ID.';
+                    return;
+                }
+
+                document.getElementById('statusMsg').innerText = 'Generating QR code...';
+                
+                pollInterval = setInterval(async () => {
+                    try {
+                        const statusRes = await fetch('/qr/status?id=' + sessionId);
+                        const statusData = await statusRes.json();
+
+                        if (statusRes.status === 200 && statusData.qr) {
+                            document.getElementById('qrCodeDiv').innerHTML = '<img src="' + statusData.qr + '" alt="QR Code"/>';
+                            document.getElementById('statusMsg').innerText = 'Scan this QR code with WhatsApp Linked Devices';
+                        } else if (statusRes.status === 200 && statusData.paired) {
+                            clearInterval(pollInterval);
+                            document.getElementById('qrContainer').innerHTML = '<div class="success-icon">✓</div>';
+                            document.getElementById('statusMsg').innerText = 'Paired Successfully! Check your WhatsApp for the Session ID.';
+                        } else if (statusRes.status === 202) {
+                            document.getElementById('statusMsg').innerText = 'Waiting for WhatsApp connection...';
+                        } else {
+                            clearInterval(pollInterval);
+                            document.getElementById('statusMsg').innerText = 'Session expired. Refresh the page to try again.';
+                            document.getElementById('qrCodeDiv').innerHTML = '<i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: #ff9800;"></i>';
+                        }
+                    } catch (e) {
+                        console.error('Polling error:', e);
+                    }
+                }, 3000);
+            } catch (err) {
+                console.error(err);
+                document.getElementById('statusMsg').innerText = 'Error initializing connection.';
+            }
+        }
+
+        window.onload = startQRFlow;
+    </script>
 </body>
 </html>
-                        `);
-                        responseSent = true;
-                    }
-                }
+    `);
+});
 
-                if (connection === "open") {
-                    sessionSentSuccess = true;
-                    await delay(5000);
-                    let sessionData = null;
-                    let attempts = 0;
-                    const maxAttempts = 10;
-                    while (attempts < maxAttempts && !sessionData) {
-                        try {
-                            const credsPath = path.join(sessionDir, id, "creds.json");
-                            if (fs.existsSync(credsPath)) {
-                                const data = fs.readFileSync(credsPath, 'utf-8');
-                                if (data && data.length > 100) {
-                                    sessionData = data;
-                                    break;
-                                }
-                            }
-                            await delay(2000);
-                            attempts++;
-                        } catch (readError) {
-                            console.error("Read error:", readError);
-                            await delay(2000);
-                            attempts++;
-                        }
-                    }
+// Endpoint to spin up a new Baileys socket session
+router.get('/start', async (req, res) => {
+    try {
+        const sessionId = casperId(8);
+        const { version } = await fetchLatestBaileysVersion();
+        const { state, saveCreds } = await useMultiFileAuthState(path.join(sessionDir, sessionId));
 
-                    if (!sessionData) {
-                        await cleanUpSession();
-                        return;
-                    }
+        let Casper = makeWASocket({
+            version,
+            auth: {
+                creds: state.creds,
+                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
+            },
+            printQRInTerminal: false,
+            logger: pino({ level: "silent" }),
+            browser: ["Ubuntu", "Chrome", "20.0.04"],
+            syncFullHistory: false,
+            markOnlineOnConnect: true,
+        });
 
-                    try {
-                        let compressedData = zlib.gzipSync(sessionData);
-                        let b64data = compressedData.toString('base64');
-                        const fullSession = 'Nexus-1MD~' + b64data;
-                        
-                        await Casper.sendMessage(Casper.user.id, { 
-                            text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Casper.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
-                        });
-                        
-                        await delay(3000);
-                        await Casper.logout();
-                    } catch (sendError) {
-                        console.error("Error sending session:", sendError);
-                    } finally {
-                        await cleanUpSession();
-                    }
-                } else if (connection === "close" && !sessionSentSuccess && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
-                    await delay(5000);
-                    CASPER_QR_CODE();
-                }
-            });
-        } catch (err) {
-            console.error("Main error:", err);
-            if (!responseSent) {
-                res.status(500).json({ code: "QR Service is Currently Unavailable" });
-                responseSent = true;
+        const sessionEntry = {
+            sock: Casper,
+            qr: null,
+            paired: false,
+            expired: false
+        };
+
+        qrSessions.set(sessionId, sessionEntry);
+
+        // Auto-cleanup after 2 minutes to prevent socket/memory leaks
+        const timeout = setTimeout(async () => {
+            if (qrSessions.has(sessionId)) {
+                console.log(`[${sessionId}] QR session expired (timeout)`);
+                sessionEntry.expired = true;
+                try {
+                    await Casper.logout();
+                } catch (e) {}
+                await removeFile(path.join(sessionDir, sessionId));
+                qrSessions.delete(sessionId);
             }
-            await cleanUpSession();
-        }
+        }, 120000);
+
+        Casper.ev.on('creds.update', saveCreds);
+        Casper.ev.on("connection.update", async (s) => {
+            const { connection, lastDisconnect, qr } = s;
+            
+            if (qr) {
+                sessionEntry.qr = qr;
+            }
+
+            if (connection === "open") {
+                clearTimeout(timeout);
+                sessionEntry.paired = true;
+                await delay(5000);
+
+                let sessionData = null;
+                let attempts = 0;
+                const maxAttempts = 10;
+                while (attempts < maxAttempts && !sessionData) {
+                    try {
+                        const credsPath = path.join(sessionDir, sessionId, "creds.json");
+                        if (fs.existsSync(credsPath)) {
+                            const data = fs.readFileSync(credsPath, 'utf-8');
+                            if (data && data.length > 100) {
+                                sessionData = data;
+                                break;
+                            }
+                        }
+                        await delay(2000);
+                        attempts++;
+                    } catch (readError) {
+                        console.error("Read error:", readError);
+                        await delay(2000);
+                        attempts++;
+                    }
+                }
+
+                if (!sessionData) {
+                    await removeFile(path.join(sessionDir, sessionId));
+                    qrSessions.delete(sessionId);
+                    return;
+                }
+
+                try {
+                    let compressedData = zlib.gzipSync(sessionData);
+                    let b64data = compressedData.toString('base64');
+                    const fullSession = 'Nexus-1MD~' + b64data;
+                    
+                    await Casper.sendMessage(Casper.user.id, { 
+                        text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Casper.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
+                    });
+                    
+                    await delay(3000);
+                    await Casper.logout();
+                } catch (sendError) {
+                    console.error("Error sending session:", sendError);
+                } finally {
+                    await removeFile(path.join(sessionDir, sessionId));
+                    qrSessions.delete(sessionId);
+                }
+            } else if (connection === "close" && !sessionEntry.paired && !sessionEntry.expired) {
+                const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== 401;
+                if (!shouldReconnect) {
+                    clearTimeout(timeout);
+                    await removeFile(path.join(sessionDir, sessionId));
+                    qrSessions.delete(sessionId);
+                }
+            }
+        });
+
+        res.json({ sessionId });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Failed to initialize QR session" });
+    }
+});
+
+// Endpoint to poll QR code image data/pairing status
+router.get('/status', async (req, res) => {
+    const sessionId = req.query.id;
+    const session = qrSessions.get(sessionId);
+
+    if (!session) {
+        return res.status(404).json({ error: "Session not found or expired" });
+    }
+
+    if (session.paired) {
+        return res.json({ paired: true });
+    }
+
+    if (!session.qr) {
+        return res.status(202).json({ status: "waiting" });
     }
 
     try {
-        await CASPER_QR_CODE();
-    } catch (finalError) {
-        console.error("Final error:", finalError);
-        await cleanUpSession();
-        if (!responseSent) {
-            res.status(500).json({ code: "Service Error" });
-        }
+        const qrImage = await QRCode.toDataURL(session.qr);
+        res.json({ qr: qrImage });
+    } catch (err) {
+        res.status(500).json({ error: "Failed to generate QR data URL" });
     }
 });
 
