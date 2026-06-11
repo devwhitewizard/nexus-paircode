@@ -5,6 +5,15 @@ const { qrRoute, pairRoute } = require('./routes');
 
 require('events').EventEmitter.defaultMaxListeners = 2000;
 
+// Prevent unhandled rejections from crashing the server
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[NEXUS] Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[NEXUS] Uncaught Exception:', err);
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));

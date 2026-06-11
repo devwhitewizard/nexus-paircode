@@ -293,34 +293,49 @@ router.get('/start', async (req, res) => {
                     clearTimeout(timeout);
                     sessionEntry.paired = true;
 
+                    // Build session immediately and store it so polling can retrieve it
                     try {
-                        const rawJid = (state.creds && state.creds.me && state.creds.me.id) || (Nexus.user && Nexus.user.id) || "";
-                        const cleanJid = rawJid.split(":")[0].split("@")[0];
-                        const userJid = cleanJid ? cleanJid + "@s.whatsapp.net" : rawJid;
-
-                        await Nexus.sendMessage(userJid, { 
-                            text: `⏳ *NEXUS-1MD CONNECTING* ⏳\n\nConnection successful! Please wait a moment while we generate your secure session ID...`
-                        });
-
-                        await delay(5000);
-
+                        await delay(3000); // let creds settle
                         const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
-                        let b64data = Buffer.from(sessionData).toString('base64');
+                        const b64data = Buffer.from(sessionData).toString('base64');
                         const fullSession = 'NEXUS~' + b64data;
                         sessionEntry.session = fullSession;
-
-                        await Nexus.sendMessage(userJid, { 
-                            text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
-                        });
-                        
-                        await delay(8000);
-                        Nexus.end();
-                    } catch (sendError) {
-                        console.error("Error sending session:", sendError);
-                    } finally {
-                        await removeFile(path.join(sessionDir, sessionId));
-                        qrSessions.delete(sessionId);
+                        console.log(`[${sessionId}] Session ID stored. Length: ${fullSession.length}`);
+                    } catch (buildErr) {
+                        console.error(`[${sessionId}] Error building session:`, buildErr);
                     }
+
+                    // Send WhatsApp messages (best effort — don't block polling on this)
+                    ;(async () => {
+                        try {
+                            const rawJid = (state.creds && state.creds.me && state.creds.me.id) || (Nexus.user && Nexus.user.id) || "";
+                            const cleanJid = rawJid.split(":")[0].split("@")[0];
+                            const userJid = cleanJid ? cleanJid + "@s.whatsapp.net" : rawJid;
+                            console.log(`[${sessionId}] Sending session to JID: ${userJid}`);
+
+                            await Nexus.sendMessage(userJid, { 
+                                text: `⏳ *NEXUS-1MD CONNECTING* ⏳\n\nConnection successful! Please wait a moment while we generate your secure session ID...`
+                            });
+
+                            await delay(5000);
+
+                            await Nexus.sendMessage(userJid, { 
+                                text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user ? Nexus.user.name : 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${sessionEntry.session}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
+                            });
+
+                            await delay(8000);
+                        } catch (sendError) {
+                            console.error(`[${sessionId}] Error sending session message:`, sendError);
+                        }
+
+                        // Gracefully close and deferred cleanup (allow polling window)
+                        try { Nexus.end(); } catch(e) {}
+                        setTimeout(async () => {
+                            await removeFile(path.join(sessionDir, sessionId));
+                            qrSessions.delete(sessionId);
+                            console.log(`[${sessionId}] QR session cleaned up.`);
+                        }, 60000);
+                    })();
                 } else if (connection === "close" && !sessionEntry.paired && !sessionEntry.expired) {
                     const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== 401;
                     if (shouldReconnect) {
