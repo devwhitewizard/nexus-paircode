@@ -11,7 +11,8 @@ const {
     useMultiFileAuthState,
     delay,
     makeCacheableSignalKeyStore,
-    fetchLatestBaileysVersion
+    fetchLatestBaileysVersion,
+    BufferJSON
 } = require("@whiskeysockets/baileys");
 
 const sessionDir = path.join(__dirname, "../temp");
@@ -264,40 +265,17 @@ router.get('/start', async (req, res) => {
                 sessionEntry.paired = true;
                 await delay(5000);
 
-                let sessionData = null;
-                let attempts = 0;
-                const maxAttempts = 10;
-                while (attempts < maxAttempts && !sessionData) {
-                    try {
-                        const credsPath = path.join(sessionDir, sessionId, "creds.json");
-                        if (fs.existsSync(credsPath)) {
-                            const data = fs.readFileSync(credsPath, 'utf-8');
-                            if (data && data.length > 100) {
-                                sessionData = data;
-                                break;
-                            }
-                        }
-                        await delay(2000);
-                        attempts++;
-                    } catch (readError) {
-                        console.error("Read error:", readError);
-                        await delay(2000);
-                        attempts++;
-                    }
-                }
-
-                if (!sessionData) {
-                    await removeFile(path.join(sessionDir, sessionId));
-                    qrSessions.delete(sessionId);
-                    return;
-                }
-
                 try {
+                    const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
                     let compressedData = zlib.gzipSync(sessionData);
                     let b64data = compressedData.toString('base64');
                     const fullSession = 'Nexus-1MD~' + b64data;
                     
-                    await Nexus.sendMessage(Nexus.user.id, { 
+                    const userJid = Nexus.user.id.includes(':') 
+                        ? Nexus.user.id.split(':')[0] + '@s.whatsapp.net' 
+                        : Nexus.user.id;
+
+                    await Nexus.sendMessage(userJid, { 
                         text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
                     });
                     
