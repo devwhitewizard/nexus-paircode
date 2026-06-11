@@ -43,8 +43,17 @@ app.get('/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Deployment Successful! Nexus-1MD Pairing Server Running on http://localhost:${PORT}`);
+});
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[NEXUS] ❌ Port ${PORT} is already in use! Close the other process first, then restart.`);
+  } else {
+    console.error('[NEXUS] Server error:', err.message);
+  }
+  process.exit(1);
 });
 
 module.exports = app;

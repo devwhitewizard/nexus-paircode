@@ -307,7 +307,8 @@ router.get('/start', async (req, res) => {
                 },
                 printQRInTerminal: false,
                 logger: pino({ level: 'silent' }),
-                browser: ['Ubuntu', 'Chrome', '20.0.04'],
+                browser: ['Nexus-1MD', 'Chrome', '120.0.0'],
+                generateHighQualityLinkPreview: true,
                 syncFullHistory: false,
                 markOnlineOnConnect: true,
             });
@@ -433,7 +434,17 @@ router.get('/status', async (req, res) => {
 
         let qrImage;
         try {
-            qrImage = await QRCode.toDataURL(session.qr);
+            qrImage = await QRCode.toDataURL(session.qr, {
+                errorCorrectionLevel: 'H',  // highest — tolerates up to 30% damage
+                type: 'image/png',
+                quality: 1,
+                margin: 2,
+                width: 512,                 // large enough for any phone camera
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            });
         } catch (e) {
             console.error(`[qr:${id}] QRCode.toDataURL failed:`, e.message);
             return res.status(500).json({ error: 'Failed to render QR code' });
