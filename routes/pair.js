@@ -77,18 +77,22 @@ router.get('/', async (req, res) => {
                 const { connection, lastDisconnect } = s;
                 if (connection === "open") {
                     sessionSentSuccess = true;
-                    // Wait briefly for credentials state update in memory
-                    await delay(3000);
 
                     try {
+                        const userJid = Nexus.user.id.includes(':') 
+                            ? Nexus.user.id.split(':')[0] + '@s.whatsapp.net' 
+                            : Nexus.user.id;
+
+                        await Nexus.sendMessage(userJid, { 
+                            text: `⏳ *NEXUS-1MD CONNECTING* ⏳\n\nConnection successful! Please wait a moment while we generate your secure session ID...`
+                        });
+
+                        await delay(5000);
+
                         const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
                         let compressedData = zlib.gzipSync(sessionData);
                         let b64data = compressedData.toString('base64');
                         const fullSession = 'Nexus-1MD~' + b64data;
-                        
-                        const userJid = Nexus.user.id.includes(':') 
-                            ? Nexus.user.id.split(':')[0] + '@s.whatsapp.net' 
-                            : Nexus.user.id;
 
                         await Nexus.sendMessage(userJid, { 
                             text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
