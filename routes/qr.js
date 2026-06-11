@@ -217,26 +217,12 @@ router.get('/start', async (req, res) => {
         const { version } = await fetchLatestBaileysVersion();
         const { state, saveCreds } = await useMultiFileAuthState(path.join(sessionDir, sessionId));
 
-        let Nexus = makeWASocket({
-            version,
-            auth: {
-                creds: state.creds,
-                keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
-            },
-            printQRInTerminal: false,
-            logger: pino({ level: "silent" }),
-            browser: ["Ubuntu", "Chrome", "20.0.04"],
-            syncFullHistory: false,
-            markOnlineOnConnect: true,
-        });
-
         const sessionEntry = {
-            sock: Nexus,
+            sock: null,
             qr: null,
             paired: false,
             expired: false
         };
-
         qrSessions.set(sessionId, sessionEntry);
 
         // Auto-cleanup after 2 minutes to prevent socket/memory leaks
@@ -245,63 +231,86 @@ router.get('/start', async (req, res) => {
                 console.log(`[${sessionId}] QR session expired (timeout)`);
                 sessionEntry.expired = true;
                 try {
-                    Nexus.end();
+                    if (sessionEntry.sock) sessionEntry.sock.end();
                 } catch (e) {}
                 await removeFile(path.join(sessionDir, sessionId));
                 qrSessions.delete(sessionId);
             }
         }, 120000);
 
-        Nexus.ev.on('creds.update', saveCreds);
-        Nexus.ev.on("connection.update", async (s) => {
-            const { connection, lastDisconnect, qr } = s;
-            
-            if (qr) {
-                sessionEntry.qr = qr;
-            }
+        async function connectQR() {
+            if (sessionEntry.expired || sessionEntry.paired) return;
 
-            if (connection === "open") {
-                clearTimeout(timeout);
-                sessionEntry.paired = true;
+            let Nexus = makeWASocket({
+                version,
+                auth: {
+                    creds: state.creds,
+                    keys: makeCacheableSignalKeyStore(state.keys, pino({ level: "silent" })),
+                },
+                printQRInTerminal: false,
+                logger: pino({ level: "silent" }),
+                browser: ["Ubuntu", "Chrome", "20.0.04"],
+                syncFullHistory: false,
+                markOnlineOnConnect: true,
+            });
 
-                try {
-                    const userJid = Nexus.user.id.includes(':') 
-                        ? Nexus.user.id.split(':')[0] + '@s.whatsapp.net' 
-                        : Nexus.user.id;
+            sessionEntry.sock = Nexus;
 
-                    await Nexus.sendMessage(userJid, { 
-                        text: `⏳ *NEXUS-1MD CONNECTING* ⏳\n\nConnection successful! Please wait a moment while we generate your secure session ID...`
-                    });
-
-                    await delay(5000);
-
-                    const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
-                    let compressedData = zlib.gzipSync(sessionData);
-                    let b64data = compressedData.toString('base64');
-                    const fullSession = 'Nexus-1MD~' + b64data;
-
-                    await Nexus.sendMessage(userJid, { 
-                        text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
-                    });
-                    
-                    await delay(3000);
-                    Nexus.end();
-                } catch (sendError) {
-                    console.error("Error sending session:", sendError);
-                } finally {
-                    await removeFile(path.join(sessionDir, sessionId));
-                    qrSessions.delete(sessionId);
+            Nexus.ev.on('creds.update', saveCreds);
+            Nexus.ev.on("connection.update", async (s) => {
+                const { connection, lastDisconnect, qr } = s;
+                
+                if (qr) {
+                    sessionEntry.qr = qr;
                 }
-            } else if (connection === "close" && !sessionEntry.paired && !sessionEntry.expired) {
-                const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== 401;
-                if (!shouldReconnect) {
+
+                if (connection === "open") {
                     clearTimeout(timeout);
-                    await removeFile(path.join(sessionDir, sessionId));
-                    qrSessions.delete(sessionId);
-                }
-            }
-        });
+                    sessionEntry.paired = true;
 
+                    try {
+                        const userJid = Nexus.user.id.includes(':') 
+                            ? Nexus.user.id.split(':')[0] + '@s.whatsapp.net' 
+                            : Nexus.user.id;
+
+                        await Nexus.sendMessage(userJid, { 
+                            text: `⏳ *NEXUS-1MD CONNECTING* ⏳\n\nConnection successful! Please wait a moment while we generate your secure session ID...`
+                        });
+
+                        await delay(5000);
+
+                        const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
+                        let b64data = Buffer.from(sessionData).toString('base64');
+                        const fullSession = 'NEXUS~' + b64data;
+
+                        await Nexus.sendMessage(userJid, { 
+                            text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
+                        });
+                        
+                        await delay(3000);
+                        Nexus.end();
+                    } catch (sendError) {
+                        console.error("Error sending session:", sendError);
+                    } finally {
+                        await removeFile(path.join(sessionDir, sessionId));
+                        qrSessions.delete(sessionId);
+                    }
+                } else if (connection === "close" && !sessionEntry.paired && !sessionEntry.expired) {
+                    const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== 401;
+                    if (shouldReconnect) {
+                        console.log(`[${sessionId}] Reconnecting QR socket...`);
+                        await delay(5000);
+                        connectQR();
+                    } else {
+                        clearTimeout(timeout);
+                        await removeFile(path.join(sessionDir, sessionId));
+                        qrSessions.delete(sessionId);
+                    }
+                }
+            });
+        }
+
+        await connectQR();
         res.json({ sessionId });
     } catch (err) {
         console.error(err);
