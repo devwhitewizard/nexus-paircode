@@ -190,8 +190,17 @@ router.get('/', async (req, res) => {
 
                         if (sessionEntry.session) {
                             const name = (Nexus.user && Nexus.user.name) ? Nexus.user.name : 'User';
+
+                            // Message 2: Session ID ALONE — easy to copy
                             await Nexus.sendMessage(userJid, {
-                                text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${name}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${sessionEntry.session}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
+                                text: sessionEntry.session
+                            });
+
+                            await delay(3000);
+
+                            // Message 3: Info footer
+                            await Nexus.sendMessage(userJid, {
+                                text: `✅ *Session generated for ${name}!*\n\n> Copy the message above and paste it as your SESSION_ID\n\n🌐 https://nexus-md.vercel.app/\n📦 github.com/devwhitewizard/nexus-v1md\n🚀 Deploy on render.com\n\n_Powered by Nexus-1MD_`
                             });
                             await delay(8000);
                         }
