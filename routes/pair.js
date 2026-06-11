@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
                         });
                         
                         await delay(3000);
-                        await Nexus.logout();
+                        Nexus.end();
                     } catch (sendError) {
                         console.error("Error sending session:", sendError);
                     } finally {

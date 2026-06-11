@@ -245,7 +245,7 @@ router.get('/start', async (req, res) => {
                 console.log(`[${sessionId}] QR session expired (timeout)`);
                 sessionEntry.expired = true;
                 try {
-                    await Nexus.logout();
+                    Nexus.end();
                 } catch (e) {}
                 await removeFile(path.join(sessionDir, sessionId));
                 qrSessions.delete(sessionId);
@@ -285,7 +285,7 @@ router.get('/start', async (req, res) => {
                     });
                     
                     await delay(3000);
-                    await Nexus.logout();
+                    Nexus.end();
                 } catch (sendError) {
                     console.error("Error sending session:", sendError);
                 } finally {
