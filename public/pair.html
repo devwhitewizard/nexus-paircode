@@ -310,6 +310,22 @@
             <p>Your pairing code is:</p>
             <div id="pair-code"></div>
             <p>Enter this code in your WhatsApp Linked Devices screen.</p>
+            
+            <div id="status-container" style="margin-top: 1.5rem; font-weight: 600; color: var(--primary); display: none;">
+                <i class="fas fa-spinner fa-spin"></i> Waiting for connection...
+            </div>
+            
+            <div id="session-container" style="display: none; margin-top: 1.5rem;">
+                <p style="color: var(--success); font-weight: bold; margin-bottom: 0.5rem;">
+                    <i class="fas fa-check-circle"></i> Connected Successfully!
+                </p>
+                <p>Your Session ID is:</p>
+                <textarea id="session-id" readonly style="width: 100%; height: 80px; padding: 10px; background: var(--input-bg); border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 8px; color: var(--primary); font-family: monospace; font-size: 0.9rem; resize: none; text-align: center; margin-bottom: 1rem; outline: none;"></textarea>
+                <button id="copy-session-btn" class="btn" style="margin-bottom: 0;">
+                    <i class="fas fa-copy"></i> COPY SESSION ID
+                </button>
+            </div>
+
             <div class="action-buttons">
                 <button id="copy-btn" class="action-btn copy-btn">
                     <i class="fas fa-copy"></i> COPY CODE
@@ -361,6 +377,8 @@
             return cleaned.length >= 10 && cleaned.length <= 15;
         }
 
+        let pollInterval = null;
+
         submitButton.addEventListener('click', async (e) => {
             e.preventDefault();
             const phoneNumber = phoneNumberInput.value.trim();
@@ -372,12 +390,34 @@
             btnText.style.display = 'none';
             btnSpinner.style.display = 'inline-block';
             submitButton.disabled = true;
+            if (pollInterval) clearInterval(pollInterval);
 
             try {
                 const { data } = await axios.get(`/code?number=${phoneNumber}`);
                 const code = data.code || "ERROR";
+                const sessionId = data.sessionId;
                 pairCodeDiv.textContent = code;
                 resultDiv.style.display = 'block';
+                
+                document.getElementById('status-container').style.display = 'block';
+                document.getElementById('status-container').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Waiting for connection...';
+                document.getElementById('session-container').style.display = 'none';
+
+                if (sessionId) {
+                    pollInterval = setInterval(async () => {
+                        try {
+                            const statusRes = await axios.get(`/code/status?id=${sessionId}`);
+                            if (statusRes.data.paired && statusRes.data.session) {
+                                clearInterval(pollInterval);
+                                document.getElementById('status-container').style.display = 'none';
+                                document.getElementById('session-id').value = statusRes.data.session;
+                                document.getElementById('session-container').style.display = 'block';
+                            }
+                        } catch (err) {
+                            console.error("Polling error:", err);
+                        }
+                    }, 3000);
+                }
             } catch (error) {
                 pairCodeDiv.textContent = "SERVICE ERROR";
                 resultDiv.style.display = 'block';
@@ -392,6 +432,19 @@
         copyButton.addEventListener('click', () => {
             const code = pairCodeDiv.textContent;
             navigator.clipboard.writeText(code).then(() => {
+                successMessage.textContent = 'Code copied to clipboard!';
+                successMessage.style.display = 'block';
+                setTimeout(() => {
+                    successMessage.style.display = 'none';
+                }, 2000);
+            });
+        });
+
+        document.getElementById('copy-session-btn').addEventListener('click', () => {
+            const sessionBox = document.getElementById('session-id');
+            sessionBox.select();
+            navigator.clipboard.writeText(sessionBox.value).then(() => {
+                successMessage.textContent = 'Session ID copied to clipboard!';
                 successMessage.style.display = 'block';
                 setTimeout(() => {
                     successMessage.style.display = 'none';

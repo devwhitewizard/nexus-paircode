@@ -154,6 +154,16 @@ router.get('/', (req, res) => {
             </div>
         </div>
         <div class="status-msg" id="statusMsg">Initializing session...</div>
+        
+        <div id="session-container" style="display: none; margin-top: 1rem;">
+            <p style="color: #4caf50; font-weight: bold; margin-bottom: 0.5rem;">Connected Successfully!</p>
+            <p>Your Session ID is:</p>
+            <textarea id="session-id" readonly style="width: 100%; height: 80px; padding: 10px; background: #1b1b2f; border: 1px solid rgba(0, 242, 254, 0.3); border-radius: 8px; color: #00f2fe; font-family: monospace; font-size: 0.9rem; resize: none; text-align: center; margin-bottom: 1rem; outline: none;"></textarea>
+            <button id="copy-session-btn" class="back-btn" style="margin-bottom: 1rem; width: 100%; border: none;">
+                <i class="fas fa-copy"></i> COPY SESSION ID
+            </button>
+        </div>
+
         <a href="./" class="back-btn">Back</a>
     </div>
 
@@ -182,10 +192,12 @@ router.get('/', (req, res) => {
                         if (statusRes.status === 200 && statusData.qr) {
                             document.getElementById('qrCodeDiv').innerHTML = '<img src="' + statusData.qr + '" alt="QR Code"/>';
                             document.getElementById('statusMsg').innerText = 'Scan this QR code with WhatsApp Linked Devices';
-                        } else if (statusRes.status === 200 && statusData.paired) {
+                        } else if (statusRes.status === 200 && statusData.paired && statusData.session) {
                             clearInterval(pollInterval);
                             document.getElementById('qrContainer').innerHTML = '<div class="success-icon">✓</div>';
-                            document.getElementById('statusMsg').innerText = 'Paired Successfully! Check your WhatsApp for the Session ID.';
+                            document.getElementById('statusMsg').innerText = 'Paired Successfully!';
+                            document.getElementById('session-id').value = statusData.session;
+                            document.getElementById('session-container').style.display = 'block';
                         } else if (statusRes.status === 202) {
                             document.getElementById('statusMsg').innerText = 'Waiting for WhatsApp connection...';
                         } else {
@@ -202,6 +214,19 @@ router.get('/', (req, res) => {
                 document.getElementById('statusMsg').innerText = 'Error initializing connection.';
             }
         }
+
+        document.getElementById('copy-session-btn').addEventListener('click', () => {
+            const sessionBox = document.getElementById('session-id');
+            sessionBox.select();
+            navigator.clipboard.writeText(sessionBox.value).then(() => {
+                const btn = document.getElementById('copy-session-btn');
+                const oldHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fas fa-check"></i> COPIED!';
+                setTimeout(() => {
+                    btn.innerHTML = oldHTML;
+                }, 2000);
+            });
+        });
 
         window.onload = startQRFlow;
     </script>
@@ -282,6 +307,7 @@ router.get('/start', async (req, res) => {
                         const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
                         let b64data = Buffer.from(sessionData).toString('base64');
                         const fullSession = 'NEXUS~' + b64data;
+                        sessionEntry.session = fullSession;
 
                         await Nexus.sendMessage(userJid, { 
                             text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
@@ -327,8 +353,8 @@ router.get('/status', async (req, res) => {
         return res.status(404).json({ error: "Session not found or expired" });
     }
 
-    if (session.paired) {
-        return res.json({ paired: true });
+    if (session.paired && session.session) {
+        return res.json({ paired: true, session: session.session });
     }
 
     if (!session.qr) {

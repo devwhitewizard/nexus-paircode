@@ -15,13 +15,13 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const sessionDir = path.join(__dirname, "../temp");
+const pairSessions = new Map();
 
 router.get('/', async (req, res) => {
-    const id = nexusId();
+    const id = nexusId(8);
     let num = req.query.number;
     let responseSent = false;
     let sessionCleanedUp = false;
-    let sessionSentSuccess = false;
 
     async function cleanUpSession() {
         if (!sessionCleanedUp) {
@@ -51,6 +51,14 @@ router.get('/', async (req, res) => {
                 markOnlineOnConnect: true,
             });
 
+            const sessionEntry = {
+                sock: Nexus,
+                paired: false,
+                expired: false,
+                session: null
+            };
+            pairSessions.set(id, sessionEntry);
+
             if (!Nexus.authState.creds.registered) {
                 await delay(3000);
                 num = num.replace(/[^0-9]/g, '');
@@ -67,7 +75,7 @@ router.get('/', async (req, res) => {
                 }
 
                 if (!responseSent && !res.headersSent) {
-                    res.json({ code: code });
+                    res.json({ code: code, sessionId: id });
                     responseSent = true;
                 }
             }
@@ -76,9 +84,16 @@ router.get('/', async (req, res) => {
             Nexus.ev.on("connection.update", async (s) => {
                 const { connection, lastDisconnect } = s;
                 if (connection === "open") {
-                    sessionSentSuccess = true;
+                    sessionEntry.paired = true;
+                    // Wait briefly for credentials state update in memory
+                    await delay(3000);
 
                     try {
+                        const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
+                        let b64data = Buffer.from(sessionData).toString('base64');
+                        const fullSession = 'NEXUS~' + b64data;
+                        sessionEntry.session = fullSession;
+
                         const rawJid = (state.creds && state.creds.me && state.creds.me.id) || (Nexus.user && Nexus.user.id) || "";
                         const cleanJid = rawJid.split(":")[0].split("@")[0];
                         const userJid = cleanJid ? cleanJid + "@s.whatsapp.net" : rawJid;
@@ -88,10 +103,6 @@ router.get('/', async (req, res) => {
                         });
 
                         await delay(5000);
-
-                        const sessionData = JSON.stringify(state.creds, BufferJSON.replacer);
-                        let b64data = Buffer.from(sessionData).toString('base64');
-                        const fullSession = 'NEXUS~' + b64data;
 
                         await Nexus.sendMessage(userJid, { 
                             text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
@@ -103,11 +114,20 @@ router.get('/', async (req, res) => {
                         console.error("Error sending session:", sendError);
                     } finally {
                         await cleanUpSession();
+                        setTimeout(() => {
+                            pairSessions.delete(id);
+                        }, 60000);
                     }
-                } else if (connection === "close" && !sessionSentSuccess && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
-                    console.log("Reconnecting...");
-                    await delay(5000);
-                    NEXUS_PAIR_CODE();
+                } else if (connection === "close" && !sessionEntry.paired && !sessionEntry.expired) {
+                    const shouldReconnect = lastDisconnect && lastDisconnect.error && lastDisconnect.error.output && lastDisconnect.error.output.statusCode !== 401;
+                    if (shouldReconnect) {
+                        console.log("Reconnecting...");
+                        await delay(5000);
+                        NEXUS_PAIR_CODE();
+                    } else {
+                        await cleanUpSession();
+                        pairSessions.delete(id);
+                    }
                 }
             });
         } catch (err) {
@@ -117,6 +137,7 @@ router.get('/', async (req, res) => {
                 responseSent = true;
             }
             await cleanUpSession();
+            pairSessions.delete(id);
         }
     }
 
@@ -125,10 +146,27 @@ router.get('/', async (req, res) => {
     } catch (finalError) {
         console.error("Final error:", finalError);
         await cleanUpSession();
+        pairSessions.delete(id);
         if (!responseSent && !res.headersSent) {
             res.status(500).json({ code: "Service Error" });
         }
     }
+});
+
+// Endpoint to poll pairing status and retrieve session ID
+router.get('/status', async (req, res) => {
+    const id = req.query.id;
+    const session = pairSessions.get(id);
+
+    if (!session) {
+        return res.status(404).json({ error: "Session not found or expired" });
+    }
+
+    if (session.paired && session.session) {
+        return res.json({ paired: true, session: session.session });
+    }
+
+    return res.json({ paired: false });
 });
 
 module.exports = router;
