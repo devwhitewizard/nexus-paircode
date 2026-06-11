@@ -1,4 +1,4 @@
-const { casperId, removeFile } = require('../lib');
+const { nexusId, removeFile } = require('../lib');
 const zlib = require('zlib');
 const express = require('express');
 const fs = require('fs');
@@ -16,7 +16,7 @@ const {
 const sessionDir = path.join(__dirname, "../temp");
 
 router.get('/', async (req, res) => {
-    const id = casperId();
+    const id = nexusId();
     let num = req.query.number;
     let responseSent = false;
     let sessionCleanedUp = false;
@@ -33,11 +33,11 @@ router.get('/', async (req, res) => {
         }
     }
 
-    async function CASPER_PAIR_CODE() {
+    async function NEXUS_PAIR_CODE() {
         const { version } = await fetchLatestBaileysVersion();
         const { state, saveCreds } = await useMultiFileAuthState(path.join(sessionDir, id));
         try {
-            let Casper = makeWASocket({
+            let Nexus = makeWASocket({
                 version,
                 auth: {
                     creds: state.creds,
@@ -50,13 +50,13 @@ router.get('/', async (req, res) => {
                 markOnlineOnConnect: true,
             });
 
-            if (!Casper.authState.creds.registered) {
+            if (!Nexus.authState.creds.registered) {
                 await delay(3000);
                 num = num.replace(/[^0-9]/g, '');
                 
                 let code = null;
                 try {
-                    code = await Casper.requestPairingCode(num);
+                    code = await Nexus.requestPairingCode(num);
                 } catch (codeErr) {
                     console.error("Error requesting pairing code:", codeErr);
                 }
@@ -71,8 +71,8 @@ router.get('/', async (req, res) => {
                 }
             }
 
-            Casper.ev.on('creds.update', saveCreds);
-            Casper.ev.on("connection.update", async (s) => {
+            Nexus.ev.on('creds.update', saveCreds);
+            Nexus.ev.on("connection.update", async (s) => {
                 const { connection, lastDisconnect } = s;
                 if (connection === "open") {
                     sessionSentSuccess = true;
@@ -110,12 +110,12 @@ router.get('/', async (req, res) => {
                         let b64data = compressedData.toString('base64');
                         const fullSession = 'Nexus-1MD~' + b64data;
                         
-                        await Casper.sendMessage(Casper.user.id, { 
-                            text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Casper.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
+                        await Nexus.sendMessage(Nexus.user.id, { 
+                            text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
                         });
                         
                         await delay(3000);
-                        await Casper.logout();
+                        await Nexus.logout();
                     } catch (sendError) {
                         console.error("Error sending session:", sendError);
                     } finally {
@@ -124,7 +124,7 @@ router.get('/', async (req, res) => {
                 } else if (connection === "close" && !sessionSentSuccess && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode !== 401) {
                     console.log("Reconnecting...");
                     await delay(5000);
-                    CASPER_PAIR_CODE();
+                    NEXUS_PAIR_CODE();
                 }
             });
         } catch (err) {
@@ -138,7 +138,7 @@ router.get('/', async (req, res) => {
     }
 
     try {
-        await CASPER_PAIR_CODE();
+        await NEXUS_PAIR_CODE();
     } catch (finalError) {
         console.error("Final error:", finalError);
         await cleanUpSession();

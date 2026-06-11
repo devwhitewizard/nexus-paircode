@@ -1,4 +1,4 @@
-const { casperId, removeFile } = require('../lib');
+const { nexusId, removeFile } = require('../lib');
 const QRCode = require('qrcode');
 const express = require('express');
 const zlib = require('zlib');
@@ -212,11 +212,11 @@ router.get('/', (req, res) => {
 // Endpoint to spin up a new Baileys socket session
 router.get('/start', async (req, res) => {
     try {
-        const sessionId = casperId(8);
+        const sessionId = nexusId(8);
         const { version } = await fetchLatestBaileysVersion();
         const { state, saveCreds } = await useMultiFileAuthState(path.join(sessionDir, sessionId));
 
-        let Casper = makeWASocket({
+        let Nexus = makeWASocket({
             version,
             auth: {
                 creds: state.creds,
@@ -230,7 +230,7 @@ router.get('/start', async (req, res) => {
         });
 
         const sessionEntry = {
-            sock: Casper,
+            sock: Nexus,
             qr: null,
             paired: false,
             expired: false
@@ -244,15 +244,15 @@ router.get('/start', async (req, res) => {
                 console.log(`[${sessionId}] QR session expired (timeout)`);
                 sessionEntry.expired = true;
                 try {
-                    await Casper.logout();
+                    await Nexus.logout();
                 } catch (e) {}
                 await removeFile(path.join(sessionDir, sessionId));
                 qrSessions.delete(sessionId);
             }
         }, 120000);
 
-        Casper.ev.on('creds.update', saveCreds);
-        Casper.ev.on("connection.update", async (s) => {
+        Nexus.ev.on('creds.update', saveCreds);
+        Nexus.ev.on("connection.update", async (s) => {
             const { connection, lastDisconnect, qr } = s;
             
             if (qr) {
@@ -297,12 +297,12 @@ router.get('/start', async (req, res) => {
                     let b64data = compressedData.toString('base64');
                     const fullSession = 'Nexus-1MD~' + b64data;
                     
-                    await Casper.sendMessage(Casper.user.id, { 
-                        text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Casper.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
+                    await Nexus.sendMessage(Nexus.user.id, { 
+                        text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
                     });
                     
                     await delay(3000);
-                    await Casper.logout();
+                    await Nexus.logout();
                 } catch (sendError) {
                     console.error("Error sending session:", sendError);
                 } finally {
