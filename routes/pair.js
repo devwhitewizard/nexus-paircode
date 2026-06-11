@@ -79,9 +79,9 @@ router.get('/', async (req, res) => {
                     sessionSentSuccess = true;
 
                     try {
-                        const userJid = Nexus.user.id.includes(':') 
-                            ? Nexus.user.id.split(':')[0] + '@s.whatsapp.net' 
-                            : Nexus.user.id;
+                        const rawJid = (state.creds && state.creds.me && state.creds.me.id) || (Nexus.user && Nexus.user.id) || "";
+                        const cleanJid = rawJid.split(":")[0].split("@")[0];
+                        const userJid = cleanJid ? cleanJid + "@s.whatsapp.net" : rawJid;
 
                         await Nexus.sendMessage(userJid, { 
                             text: `⏳ *NEXUS-1MD CONNECTING* ⏳\n\nConnection successful! Please wait a moment while we generate your secure session ID...`
@@ -97,7 +97,7 @@ router.get('/', async (req, res) => {
                             text: `🌟 *NEXUS-1MD SESSION* 🌟\n\n👋 Hello ${Nexus.user.name || 'User'}!\n\nYour session has been generated successfully ✅\n\n\`\`\`${fullSession}\`\`\`\n\n*Official Website*\n| https://nexus-md.vercel.app/\n\n*Visit for more*\n| github.com/devwhitewizard/nexus-v1md\n\n*Deploy your bot now*\n| render.com\n\n🚀 *Powered by Nexus-1MD*`
                         });
                         
-                        await delay(3000);
+                        await delay(8000);
                         Nexus.end();
                     } catch (sendError) {
                         console.error("Error sending session:", sendError);
