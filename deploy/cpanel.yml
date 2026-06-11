@@ -1,0 +1,4 @@
+deployment:
+  tasks:
+    - export DEPLOYPATH=/nexus-paircode/public_html/
+    - /bin/cp -R public $DEPLOYPATH
