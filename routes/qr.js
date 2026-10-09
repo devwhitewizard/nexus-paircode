@@ -378,7 +378,7 @@ router.get('/start', async (req, res) => {
 
                             // Message 3: Info footer
                             await Nexus.sendMessage(userJid, {
-                                text: `✅ *Session generated for ${name}!*\n\n> Copy the message above and paste it as your SESSION_ID\n\n🌐 https://nexus-md.vercel.app/\n📦 github.com/devwhitewizard/nexus-v1md\n🚀 Deploy on render.com\n\n_Powered by Nexus-1MD_`
+                                text: `✅ *Session generated for ${name}!*\n\n> Copy the message above and paste it as your SESSION_ID\n\n🌐 https://nexus.whitewizard.top/\n📦 github.com/devwhitewizard/nexus-v1md\n🚀 Deploy on panel.whitewizard.top\n\n_Powered by Nexus-MD_`
                             });
                             await delay(8000);
                         }

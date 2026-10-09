@@ -11,7 +11,8 @@ const {
     makeCacheableSignalKeyStore,
     fetchLatestBaileysVersion,
     BufferJSON,
-    DisconnectReason
+    DisconnectReason,
+    Browsers
 } = require('@whiskeysockets/baileys');
 
 const sessionDir = path.join(__dirname, '../temp');
@@ -116,7 +117,7 @@ router.get('/', async (req, res) => {
                 },
                 printQRInTerminal: false,
                 logger: pino({ level: 'silent' }),
-                browser: ['Ubuntu', 'Chrome', '20.0.04'],
+                browser: Browsers.ubuntu('Chrome'),
                 syncFullHistory: false,
                 markOnlineOnConnect: true,
             });
@@ -163,8 +164,9 @@ router.get('/', async (req, res) => {
                 sessionEntry.paired = true;
                 console.log(`[pair:${id}] Connection opened`);
 
-                // Build session string immediately
+                // Build session string after credentials settle
                 try {
+                    await delay(3000); // let creds settle
                     sessionEntry.session = buildSession(state.creds);
                     console.log(`[pair:${id}] Session built (${sessionEntry.session.length} chars)`);
                 } catch (e) {
@@ -200,7 +202,7 @@ router.get('/', async (req, res) => {
 
                             // Message 3: Info footer
                             await Nexus.sendMessage(userJid, {
-                                text: `✅ *Session generated for ${name}!*\n\n> Copy the message above and paste it as your SESSION_ID\n\n🌐 https://nexus-md.vercel.app/\n📦 github.com/devwhitewizard/nexus-v1md\n🚀 Deploy on render.com\n\n_Powered by Nexus-1MD_`
+                                text: `✅ *Session generated for ${name}!*\n\n> Copy the message above and paste it as your SESSION_ID\n\n🌐 https://nexus.whitewizard.top/\n📦 github.com/devwhitewizard/nexus-v1md\n🚀 Deploy on panel.whitewizard.top\n\n_Powered by Nexus-1MD_`
                             });
                             await delay(8000);
                         }
